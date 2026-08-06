@@ -1485,6 +1485,25 @@ public abstract class QuerityGenericTestSuite<T extends Person<K, ?, ?, ? extend
         assertThat(map).containsKey("lastNameLength");
       });
     }
+
+    @Test
+    void givenSelectWithNullifFunctionAndLiteral_whenFindAllProjected_thenReturnProjectedResults() {
+      if (!supportsFunctionExpressionsInProjections()) return;
+      // Select NULLIF(lastName, entity1's lastName) as nullifLastName
+      String targetLastName = entity1.getLastName();
+      AdvancedQuery query = Querity.advancedQuery()
+          .filter(filterBy(PROPERTY_LAST_NAME, IS_NOT_NULL))
+          .select(nullif(property(PROPERTY_LAST_NAME), lit(targetLastName)).as("nullifLastName"))
+          .build();
+      List<Map<String, Object>> result = querity.findAllProjected(getEntityClass(), query);
+      assertThat(result).isNotEmpty();
+      List<Object> expected = entities.stream()
+          .filter(p -> p.getLastName() != null)
+          .map(p -> p.getLastName().equals(targetLastName) ? null : (Object) p.getLastName())
+          .toList();
+      assertThat(result.stream().map(map -> map.get("nullifLastName")).toList())
+          .containsExactlyInAnyOrderElementsOf(expected);
+    }
   }
 
   protected abstract Class<T> getEntityClass();

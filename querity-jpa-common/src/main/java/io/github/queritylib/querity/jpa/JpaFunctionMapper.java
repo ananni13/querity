@@ -248,8 +248,12 @@ public class JpaFunctionMapper {
   /**
    * NULLIF function implementation.
    *
-   * <p>JPA CriteriaBuilder.nullif(Expression, Y) only accepts a literal as second argument.
-   * When the second argument is a PropertyExpression (field reference), we cannot use the
+   * <p>JPA CriteriaBuilder.nullif(Expression, Y) only accepts a literal as second argument,
+   * where Y is the raw literal value: the Querity {@link Literal} wrapper must be unwrapped
+   * before passing it, otherwise the persistence provider tries to convert the wrapper itself
+   * to the expression type and fails.
+   *
+   * <p>When the second argument is a PropertyExpression (field reference), we cannot use the
    * standard nullif() method.
    *
    * <p>Workaround: We emulate NULLIF(a, b) using CASE WHEN:
@@ -260,17 +264,16 @@ public class JpaFunctionMapper {
    */
   private static Expression<?> nullif(List<FunctionArgument> args, Root<?> root, CriteriaBuilder cb, Metamodel metamodel) {
     Expression<Object> first = castExpression(toExpressionOrLiteral(args.get(0), root, cb, metamodel));
-    Object second = args.get(1);
+    FunctionArgument second = args.get(1);
 
-    if (second instanceof PropertyExpression pe) {
-      // PropertyExpression requires CASE WHEN workaround (see Javadoc above)
-      Expression<Object> secondExpr = castExpression(toExpressionOrLiteral(pe, root, cb, metamodel));
-      return cb.<Object>selectCase()
-          .when(cb.equal(first, secondExpr), cb.nullLiteral(Object.class))
-          .otherwise(first);
-    } else {
-      return cb.nullif(first, second);
+    if (second instanceof Literal lit) {
+      return cb.nullif(first, lit.getValue());
     }
+    // PropertyExpression requires CASE WHEN workaround (see Javadoc above)
+    Expression<Object> secondExpr = castExpression(toExpressionOrLiteral(second, root, cb, metamodel));
+    return cb.<Object>selectCase()
+        .when(cb.equal(first, secondExpr), cb.nullLiteral(Object.class))
+        .otherwise(first);
   }
 
   // --- Aggregate functions ---
