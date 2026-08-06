@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -392,12 +393,15 @@ class JpaFunctionMapperTests {
 
     @Test
     @SuppressWarnings("unchecked")
-    void givenNullifFunctionWithLiteral_whenToExpression_thenReturnNullifExpression() {
+    void givenNullifFunctionWithLiteral_whenToExpression_thenReturnNullifExpressionWithUnwrappedLiteralValue() {
       Expression<Object> nullifExpr = mock(Expression.class);
       when(cb.nullif(any(Expression.class), any(Object.class))).thenReturn(nullifExpr);
       FunctionCall fc = FunctionCall.of(Function.NULLIF, PropertyReference.of("status"), Literal.of("INACTIVE"));
       Expression<?> result = JpaFunctionMapper.toExpression(fc, root, cb, metamodel);
       assertThat(result).isEqualTo(nullifExpr);
+      // the literal wrapper must be unwrapped, otherwise the persistence provider
+      // cannot convert it to the expression type
+      verify(cb).nullif(any(Expression.class), eq("INACTIVE"));
     }
 
     @Test
